@@ -1,116 +1,170 @@
-import collections
+"""
+Q1. Form tokenization and filter stop words & punctuation.
 
-def q1_ngram_model():
-    file_path = r"c:\Users\jrpha\OneDrive\Documents\txsa assignment\Part A Dataset\Data_1.txt"
-    
-    with open(file_path, 'r', encoding='utf-8') as f:
-        lines = f.readlines()
-    
-    # Parse the file content
-    training_data = []
-    test_sentence = ""
-    
-    mode = "none"
-    for line in lines:
-        line = line.strip()
-        if not line or line.startswith("~~"):
+This file demonstrates three tokenization approaches on Data_1.txt:
+1. split()
+2. Regular expression tokenization
+3. NLTK word_tokenize
+
+The file then uses the NLTK tokens as the group's preferred approach to:
+- identify stop words found in the corpus
+- identify punctuation found in the corpus
+- remove stop words and punctuation
+- print the filtered output
+
+Report note:
+The explanation in the report should state that NLTK word_tokenize is the
+most suitable choice here because it separates punctuation cleanly while
+preserving natural word boundaries better than split().
+"""
+
+import re
+import string
+from pathlib import Path
+
+import nltk
+from nltk.tokenize import word_tokenize
+
+
+DATA_PATH = Path(__file__).resolve().parent / "Part A Dataset" / "Data_1.txt"
+FALLBACK_STOP_WORDS = {
+    "a",
+    "all",
+    "an",
+    "and",
+    "are",
+    "be",
+    "each",
+    "for",
+    "from",
+    "in",
+    "is",
+    "it",
+    "may",
+    "of",
+    "other",
+    "the",
+    "to",
+}
+
+
+def load_stop_words():
+    try:
+        from nltk.corpus import stopwords
+
+        return set(stopwords.words("english"))
+    except LookupError:
+        return FALLBACK_STOP_WORDS
+
+
+def ensure_nltk_resource(resource_path, download_name):
+    try:
+        nltk.data.find(resource_path)
+    except LookupError:
+        nltk.download(download_name, quiet=True)
+
+
+def remove_punctuation_and_stop_words(tokens, stop_words):
+    cleaned_tokens = []
+    removed_stop_words = []
+    removed_punctuation = []
+
+    for token in tokens:
+        lower_token = token.lower()
+
+        if token in string.punctuation:
+            removed_punctuation.append(token)
             continue
-            
-        if line == "Training Corpus":
-            mode = "train"
-        elif line.startswith("Calculate sentence probability"):
-            mode = "test"
-        else:
-            if mode == "train":
-                training_data.append(line)
-            elif mode == "test":
-                test_sentence = line
 
-    print(f"Training Data ({len(training_data)} sentences):")
-    for s in training_data:
-        print(f"  {s}")
-    print(f"\nTest Sentence: {test_sentence}\n")
+        if lower_token in stop_words:
+            removed_stop_words.append(token)
+            continue
 
-    # --- 1. Preprocessing ---
-    # Tokenize (simple split by space)
-    # Note: <s> and </s> are treated as tokens
-    train_tokens = [s.split() for s in training_data]
-    test_tokens = test_sentence.split()
-    
-    # Flatten training tokens for unigram counts
-    all_train_tokens = [token for sent in train_tokens for token in sent]
-    
-    # --- 2. Unigram Model ---
-    vocab = set(all_train_tokens)
-    unigram_counts = collections.Counter(all_train_tokens)
-    total_tokens = len(all_train_tokens)
-    
-    print("--- Unigram Counts & Probabilities ---")
-    print(f"{'Token':<15} {'Count':<10} {'Probability':<10}")
-    for token, count in unigram_counts.items():
-        prob = count / total_tokens
-        print(f"{token:<15} {count:<10} {prob:.4f}")
-    
-    # --- 3. Bigram Model ---
-    bigram_counts = collections.defaultdict(int)
-    bigram_context_counts = collections.defaultdict(int) # Count of w1 in (w1, w2)
-    
-    for sent in train_tokens:
-        for i in range(len(sent) - 1):
-            w1 = sent[i]
-            w2 = sent[i+1]
-            bigram_counts[(w1, w2)] += 1
-            bigram_context_counts[w1] += 1
-            
-    print("\n--- Bigram Counts & Probabilities (MLE) ---")
-    print(f"{'Bigram':<25} {'Count':<10} {'P(w2|w1)':<10}")
-    
-    # We will compute properties for the Bigrams found in the Test Sentence
-    # To show the work for the specific task
-    
-    test_bigrams = []
-    for i in range(len(test_tokens) - 1):
-        test_bigrams.append((test_tokens[i], test_tokens[i+1]))
-        
-    sentence_prob = 1.0
-    print("\n--- Calculation for Test Sentence ---")
-    print(f"Test Sentence: {test_sentence}")
-    print(f"{'Bigram':<25} {'Count(w1,w2)':<15} {'Count(w1)':<10} {'P(w2|w1)':<10}")
-    
-    for w1, w2 in test_bigrams:
-        count_w1_w2 = bigram_counts[(w1, w2)]
-        count_w1 = bigram_context_counts[w1]
-        
-        # MLE Probability
-        if count_w1 > 0:
-            prob = count_w1_w2 / count_w1
-        else:
-            prob = 0.0
-            
-        sentence_prob *= prob
-        print(f"{(w1 + ' ' + w2):<25} {count_w1_w2:<15} {count_w1:<10} {prob:.4f}")
+        cleaned_tokens.append(token)
 
-    print(f"\nTotal Sentence Probability (Bigram MLE): {sentence_prob:.10f}")
-    
-    # Optional: Laplace Smoothing (Add-One)
-    print("\n--- Laplace Smoothing (Add-One) ---")
-    vocab_size = len(vocab)
-    smoothed_prob = 1.0
-    print(f"Vocab Size (V): {vocab_size}")
-    print(f"{'Bigram':<25} {'Count+1':<15} {'Count(w1)+V':<15} {'P_smooth':<10}")
+    return cleaned_tokens, removed_stop_words, removed_punctuation
 
-    for w1, w2 in test_bigrams:
-        count_w1_w2 = bigram_counts[(w1, w2)]
-        count_w1 = bigram_context_counts[w1]
-        
-        # P_add1(w2|w1) = (count(w1,w2) + 1) / (count(w1) + V)
-        # Note: Depending on definition, V might be the vocab size (unique types)
-        
-        prob_smooth = (count_w1_w2 + 1) / (count_w1 + vocab_size)
-        smoothed_prob *= prob_smooth
-        print(f"{(w1 + ' ' + w2):<25} {count_w1_w2+1:<15} {count_w1 + vocab_size:<15} {prob_smooth:.4f}")
 
-    print(f"\nTotal Sentence Probability (Add-One Smoothed): {smoothed_prob:.10f}")
+def q1_tokenization_and_filtering():
+    text = DATA_PATH.read_text(encoding="utf-8").strip()
+    ensure_nltk_resource("tokenizers/punkt", "punkt")
+
+    # The three outputs below directly support the Q1 comparison in the report.
+    split_tokens = text.split()
+    regex_tokens = re.findall(r"\w+(?:-\w+)*(?:'\w+)?|[^\w\s]", text)
+    nltk_tokens = word_tokenize(text)
+
+    print("--- Q1.1 Tokenization Outputs ---")
+    print("Original text:")
+    print(text)
+    print()
+
+    print("1. split() tokenization")
+    print(split_tokens)
+    print(f"Token count: {len(split_tokens)}\n")
+
+    print("2. Regular Expression tokenization")
+    print(regex_tokens)
+    print(f"Token count: {len(regex_tokens)}\n")
+
+    print("3. NLTK tokenization")
+    print(nltk_tokens)
+    print(f"Token count: {len(nltk_tokens)}\n")
+
+    print("--- Q1.2 Suitable Tokenization Justification ---")
+    print(
+        "NLTK tokenization is the most suitable choice for this corpus because it "
+        "keeps punctuation as separate tokens while preserving the original words."
+    )
+    print(
+        "split() leaves punctuation attached to words such as 'input.' and "
+        "'variants.', while the regex version removes spacing well but is less "
+        "standardized than NLTK for later NLP tasks."
+    )
+    print()
+
+    stop_words = load_stop_words()
+    # Stop-word and punctuation filtering is demonstrated using the preferred
+    # tokenization output so the cleaned result is consistent and easier to justify.
+    filtered_tokens, stop_words_found, punctuation_found = remove_punctuation_and_stop_words(
+        nltk_tokens,
+        stop_words,
+    )
+
+    unique_stop_words_found = list(dict.fromkeys(token.lower() for token in stop_words_found))
+    unique_punctuation_found = list(dict.fromkeys(punctuation_found))
+
+    print("--- Q1.3 Stop Words and Punctuation Removal ---")
+    print("Stop words found in the corpus:")
+    print(unique_stop_words_found)
+    print()
+
+    print("Punctuation found in the corpus:")
+    print(unique_punctuation_found)
+    print()
+
+    print("Filtered tokens:")
+    print(filtered_tokens)
+    print()
+
+    print("Filtered text:")
+    print(" ".join(filtered_tokens))
+    print()
+
+    print("--- Q1.4 Importance of Filtering ---")
+    print(
+        "Removing stop words reduces very common words that add little meaning to "
+        "classification or similarity tasks."
+    )
+    print(
+        "Removing punctuation standardizes the corpus and prevents symbols from "
+        "being treated as meaningful content features."
+    )
+    print(
+        "Together, both steps help the model focus on informative content words "
+        "such as 'classification', 'labels', 'variants', and 'sequence'."
+    )
+
 
 if __name__ == "__main__":
-    q1_ngram_model()
+    q1_tokenization_and_filtering()

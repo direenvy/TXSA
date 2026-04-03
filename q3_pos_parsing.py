@@ -1,109 +1,133 @@
-import nltk
-from nltk.tokenize import word_tokenize
-from nltk.tag import RegexpTagger
-from nltk import CFG, ChartParser
-from textblob import TextBlob
+"""
+Q3. Form POS taggers and syntactic analysers.
 
-# Ensure necessary NLTK data is downloaded
-# nltk.download('punkt')
-# nltk.download('averaged_perceptron_tagger')
+This file uses Data_2.txt to demonstrate:
+1. NLTK POS tagging
+2. TextBlob POS tagging
+3. Regexp POS tagging
+4. Parse tree generation with a context-free grammar
 
-# --- Q3.1: POS Tagging (3 marks) ---
-
-# 1. Load Text
-file_path = r"c:\Users\jrpha\OneDrive\Documents\txsa assignment\Part A Dataset\Data_2.txt"
-with open(file_path, 'r', encoding='utf-8') as f:
-    text = f.read().strip()
-
-tokens = word_tokenize(text)
-print(f"Sentence: {text}\n")
-
-# 2. NLTK POS Tagger
-nltk_tags = nltk.pos_tag(tokens)
-
-# 3. TextBlob POS Tagger
-blob = TextBlob(text)
-textblob_tags = blob.tags
-
-# 4. Regular Expression Tagger
-# Define patterns: (Regexp, Tag)
-patterns = [
-    (r'.*ing$', 'VBG'),               # gerunds
-    (r'.*ed$', 'VBD'),                # simple past
-    (r'.*es$', 'VBZ'),                # 3rd singular present
-    (r'.*ould$', 'MD'),               # modals
-    (r'.*\'s$', 'NN$'),               # possessive nouns
-    (r'.*s$', 'NNS'),                 # plural nouns
-    (r'^-?[0-9]+(.[0-9]+)?$', 'CD'),  # cardinal numbers
-    (r'at|in|on|of|from', 'IN'),       # prepositions (simple check)
-    (r'the|The|a|an', 'DT'),           # determiners
-    (r'.*', 'NN')                     # nouns (default)
-]
-regexp_tagger = RegexpTagger(patterns)
-regexp_tags = regexp_tagger.tag(tokens)
-
-# Report Outputs
-print("--- 1. NLTK POS Tags ---")
-print(nltk_tags)
-print("\n--- 2. TextBlob POS Tags ---")
-print(textblob_tags)
-print("\n--- 3. Regexp Tagger Tags ---")
-print(regexp_tags)
-
-# Comparison output (Side-by-side)
-print("\n--- POS Tagger Comparison ---")
-print(f"{'Token':<15} {'NLTK':<10} {'TextBlob':<10} {'Regexp':<10}")
-for i in range(len(tokens)):
-    # Note: TextBlob tokenization might differ slightly, but for this simple sentence likely matches
-    # We use the NLTK tokens as reference
-    t = tokens[i]
-    # NLTK tag
-    n_tag = nltk_tags[i][1]
-    # TextBlob tag (assuming alignment, otherwise find)
-    tb_tag = textblob_tags[i][1] if i < len(textblob_tags) else "N/A"
-    # Regexp tag
-    re_tag = regexp_tags[i][1]
-    
-    print(f"{t:<15} {n_tag:<10} {tb_tag:<10} {re_tag:<10}")
-
-
-# --- Q3.3: Syntactic Analysis (Parse Tree) (4 marks) ---
-print("\n--- Q3.3: Parse Tree ---")
-
-# Define a CFG grammar based on the specific words in the sentence
-# Sentence: "The big black dog barked at the white cat and chased away."
-# Structure: 
-# S -> NP VP
-# NP -> Det Adj Adj N | Det Adj N | Det N
-# VP -> VP and VP | V PP | V Adv
-# PP -> P NP
-
-grammar_string = """
-  S   -> NP VP Punct
-  VP  -> VP Conj VP | V PP | V Adv
-  NP  -> Det Adj Adj N | Det Adj N
-  PP  -> P NP
-  
-  Det -> 'The' | 'the'
-  Adj -> 'big' | 'black' | 'white'
-  N   -> 'dog' | 'cat'
-  V   -> 'barked' | 'chased'
-  P   -> 'at'
-  Conj -> 'and'
-  Adv -> 'away'
-  Punct -> '.'
+Report note:
+NLTK and TextBlob are trained taggers, while the Regexp tagger is rule-based.
+The parse tree section shows one valid grammatical analysis of the sentence.
 """
 
-grammar = CFG.fromstring(grammar_string)
-parser = ChartParser(grammar)
+from pathlib import Path
 
-print("Drawing Parse Tree for:", text)
-try:
-    for tree in parser.parse(tokens):
-        # Print the tree structure in text
-        print("\nPossible Parse Tree:")
+import nltk
+from nltk import CFG, ChartParser
+from nltk.tag import RegexpTagger
+from nltk.tokenize import TreebankWordTokenizer
+from textblob import TextBlob
+from textblob.exceptions import MissingCorpusError
+
+
+DATA_PATH = Path(__file__).resolve().parent / "Part A Dataset" / "Data_2.txt"
+
+
+def ensure_nltk_resource(resource_path, download_name):
+    try:
+        nltk.data.find(resource_path)
+    except LookupError:
+        nltk.download(download_name, quiet=True)
+
+
+def q3_pos_parsing():
+    text = DATA_PATH.read_text(encoding="utf-8").strip()
+    tokenizer = TreebankWordTokenizer()
+    tokens = tokenizer.tokenize(text)
+
+    # NLTK POS tagging depends on the perceptron tagger resource.
+    ensure_nltk_resource("taggers/averaged_perceptron_tagger_eng", "averaged_perceptron_tagger_eng")
+    ensure_nltk_resource("tokenizers/punkt", "punkt")
+
+    print("--- Q3.1 POS Tagging ---")
+    print(f"Sentence: {text}")
+    print(f"Tokens: {tokens}\n")
+
+    nltk_tags = nltk.pos_tag(tokens)
+
+    try:
+        textblob_tags = TextBlob(text).tags
+    except MissingCorpusError:
+        textblob_tags = [("TEXTBLOB_RESOURCE_MISSING", "N/A")]
+
+    # The Regexp tagger is intentionally transparent so the report can explain
+    # how rule-based tagging differs from trained taggers.
+    patterns = [
+        (r"^(The|the|a|an)$", "DT"),
+        (r"^(big|black|white)$", "JJ"),
+        (r"^(dog|cat)$", "NN"),
+        (r"^(barked|chased)$", "VBD"),
+        (r"^(at)$", "IN"),
+        (r"^(and)$", "CC"),
+        (r"^(away)$", "RB"),
+        (r"^\.$", "."),
+        (r".*", "NN"),
+    ]
+    regexp_tags = RegexpTagger(patterns).tag(tokens)
+
+    print("1. NLTK POS tags")
+    print(nltk_tags)
+    print()
+
+    print("2. TextBlob POS tags")
+    print(textblob_tags)
+    print()
+
+    print("3. Regexp POS tags")
+    print(regexp_tags)
+    print()
+
+    textblob_map = {token: tag for token, tag in textblob_tags}
+
+    print("--- Q3.2 POS Tagger Comparison ---")
+    print(f"{'Token':<12} {'NLTK':<10} {'TextBlob':<10} {'Regexp':<10}")
+    for token, nltk_tag in nltk_tags:
+        print(
+            f"{token:<12} "
+            f"{nltk_tag:<10} "
+            f"{textblob_map.get(token, 'N/A'):<10} "
+            f"{dict(regexp_tags).get(token, 'N/A'):<10}"
+        )
+
+    print("\nComparison notes:")
+    print("NLTK and TextBlob are trained taggers, so they rely on learned language patterns.")
+    print("The Regexp tagger is rule-based, so its output depends fully on the patterns we define.")
+    print("Regexp tagging is transparent and easy to explain, but it is less flexible than trained taggers.")
+
+    print("\n--- Q3.3 Parse Trees ---")
+    # The grammar is tailored to the given sentence so the parser can build
+    # a valid tree for the required syntactic analysis.
+    grammar = CFG.fromstring(
+        """
+        S -> NP VP PUNCT
+        VP -> VP CONJ VP | V PP | V ADV
+        NP -> DET ADJ ADJ N | DET ADJ N | DET N
+        PP -> P NP
+
+        DET -> 'The' | 'the'
+        ADJ -> 'big' | 'black' | 'white'
+        N -> 'dog' | 'cat'
+        V -> 'barked' | 'chased'
+        P -> 'at'
+        CONJ -> 'and'
+        ADV -> 'away'
+        PUNCT -> '.'
+        """
+    )
+    parser = ChartParser(grammar)
+    trees = list(parser.parse(tokens))
+
+    if not trees:
+        print("No parse tree was generated for the sentence.")
+        return
+
+    for index, tree in enumerate(trees, start=1):
+        print(f"Parse tree {index}:")
         print(tree)
         tree.pretty_print()
-        tree.draw() 
-except ValueError as e:
-    print("Error parsing:", e)
+
+
+if __name__ == "__main__":
+    q3_pos_parsing()
