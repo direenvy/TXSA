@@ -1,0 +1,5 @@
+Model,Search Type,Best CV F1,Test Accuracy,Best Params
+Naive Bayes,GridSearchCV,0.9110,0.9121,"{'alpha': 5.0, 'max_features': 10000, 'ngram_range': (1, 2)}"
+Logistic Regression,GridSearchCV,0.9243,0.9250,"{'C': 1.0, 'solver': 'lbfgs', 'max_features': 10000, 'ngram_range': (1, 2)}"
+Linear SVM,GridSearchCV,0.9320,0.9320,"{'C': 1.0, 'loss': 'hinge', 'max_features': 10000, 'ngram_range': (1, 2)}"
+Random Forest,RandomizedSearchCV,0.9297,0.9284,"{'max_features': 'log2', 'n_estimators': 300, 'min_samples_split': 10, 'min_samples_leaf': 2, 'max_depth': None}"
